@@ -1,0 +1,4 @@
+# Pulls in Home Assistant itself plus the test harness.
+pytest-homeassistant-custom-component==0.13.316
+# `frontend` is a manifest dependency, and it refuses to start without this.
+home-assistant-frontend==20260128.6

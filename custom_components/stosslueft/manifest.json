@@ -1,0 +1,13 @@
+{
+  "domain": "stosslueft",
+  "name": "Stoßlüften",
+  "codeowners": ["@leonherrmann"],
+  "config_flow": true,
+  "dependencies": ["http", "frontend"],
+  "documentation": "https://github.com/leonherrmann/HA-Stosslueft",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/leonherrmann/HA-Stosslueft/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
