@@ -1,0 +1,95 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Outdoor conditions",
+        "description": "Pick where the outdoor readings come from. Either a sensor or a weather entity works; a physical thermometer near the flat is more accurate than a forecast.",
+        "data": {
+          "outdoor_temperature": "Outdoor temperature",
+          "outdoor_humidity": "Outdoor humidity (optional)"
+        }
+      },
+      "rooms": {
+        "title": "Rooms",
+        "description": "These rooms were found in your areas. Untick anything you do not want scored -- you can edit the individual sensors later under Configure.",
+        "data": {
+          "rooms": "Rooms"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Stoßlüften is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Stoßlüften",
+        "menu_options": {
+          "settings": "Settings",
+          "rooms": "Rooms",
+          "discover": "Look for new rooms"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "data": {
+          "target_temperature": "Target temperature",
+          "comfort_band": "Comfort band",
+          "humidity_weight": "Humidity weight",
+          "recommend_threshold": "Recommendation threshold",
+          "settle_minutes": "Settle time after closing",
+          "min_session_minutes": "Shortest session to count",
+          "rain_guard": "Cap the score while it rains"
+        },
+        "data_description": {
+          "comfort_band": "How far from the target still counts as comfortable, so small differences do not push the score around.",
+          "humidity_weight": "How much the humidity comparison counts. 0 turns humidity off; damp rooms raise this automatically.",
+          "settle_minutes": "Indoor sensors keep falling after the windows shut. Waiting gives an honest cooldown figure.",
+          "min_session_minutes": "Anything shorter is treated as a glance out of the window, not as airing."
+        }
+      },
+      "rooms": {
+        "title": "Rooms",
+        "description": "Pick a room to edit, or add a new one.",
+        "data": {
+          "room_id": "Room"
+        }
+      },
+      "room": {
+        "title": "Edit room",
+        "description": "Editing {name}. Clearing both the temperature and the window entity removes the room.",
+        "data": {
+          "name": "Name",
+          "temperature_entity": "Temperature sensor",
+          "humidity_entity": "Humidity sensor (optional)",
+          "window_entity": "Window contact (optional)"
+        }
+      },
+      "discover": {
+        "title": "New rooms",
+        "description": "These areas are not configured yet.",
+        "data": {
+          "rooms": "Rooms"
+        }
+      }
+    },
+    "abort": {
+      "no_new_rooms": "Every area with a thermometer or a window contact is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "score": { "name": "Airing score" },
+      "room_score": { "name": "{room} airing score" },
+      "indoor_temperature": { "name": "Indoor temperature" },
+      "last_cooldown": { "name": "Last airing cooldown" },
+      "room_cooldown": { "name": "{room} airing cooldown" },
+      "cooldown_today": { "name": "Airing cooldown today" }
+    },
+    "binary_sensor": {
+      "airing_recommended": { "name": "Airing recommended" },
+      "airing_active": { "name": "Airing active" }
+    }
+  }
+}

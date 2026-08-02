@@ -1,0 +1,95 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Außenbedingungen",
+        "description": "Woher kommen die Außenwerte? Ein Sensor oder eine Wetter-Entität funktionieren beide; ein echtes Thermometer an der Wohnung ist genauer als eine Vorhersage.",
+        "data": {
+          "outdoor_temperature": "Außentemperatur",
+          "outdoor_humidity": "Außenluftfeuchtigkeit (optional)"
+        }
+      },
+      "rooms": {
+        "title": "Räume",
+        "description": "Diese Räume wurden in deinen Bereichen gefunden. Hake ab, was nicht bewertet werden soll -- die einzelnen Sensoren kannst du später unter Konfigurieren ändern.",
+        "data": {
+          "rooms": "Räume"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Stoßlüften ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Stoßlüften",
+        "menu_options": {
+          "settings": "Einstellungen",
+          "rooms": "Räume",
+          "discover": "Nach neuen Räumen suchen"
+        }
+      },
+      "settings": {
+        "title": "Einstellungen",
+        "data": {
+          "target_temperature": "Zieltemperatur",
+          "comfort_band": "Komfortbereich",
+          "humidity_weight": "Gewichtung der Luftfeuchtigkeit",
+          "recommend_threshold": "Schwelle für die Empfehlung",
+          "settle_minutes": "Nachlaufzeit nach dem Schließen",
+          "min_session_minutes": "Kürzeste zählende Lüftung",
+          "rain_guard": "Bewertung bei Regen begrenzen"
+        },
+        "data_description": {
+          "comfort_band": "Wie weit die Temperatur von der Zieltemperatur abweichen darf, ohne dass die Bewertung darauf reagiert.",
+          "humidity_weight": "Wie stark der Feuchtevergleich zählt. 0 schaltet ihn ab; in feuchten Räumen steigt er automatisch an.",
+          "settle_minutes": "Die Innensensoren fallen nach dem Schließen noch weiter. Das Warten liefert einen ehrlichen Wert.",
+          "min_session_minutes": "Alles Kürzere gilt als kurzer Blick aus dem Fenster, nicht als Lüften."
+        }
+      },
+      "rooms": {
+        "title": "Räume",
+        "description": "Wähle einen Raum zum Bearbeiten oder lege einen neuen an.",
+        "data": {
+          "room_id": "Raum"
+        }
+      },
+      "room": {
+        "title": "Raum bearbeiten",
+        "description": "{name} wird bearbeitet. Wenn du Temperatur- und Fensterentität leerst, wird der Raum entfernt.",
+        "data": {
+          "name": "Name",
+          "temperature_entity": "Temperatursensor",
+          "humidity_entity": "Feuchtigkeitssensor (optional)",
+          "window_entity": "Fensterkontakt (optional)"
+        }
+      },
+      "discover": {
+        "title": "Neue Räume",
+        "description": "Diese Bereiche sind noch nicht eingerichtet.",
+        "data": {
+          "rooms": "Räume"
+        }
+      }
+    },
+    "abort": {
+      "no_new_rooms": "Alle Bereiche mit Thermometer oder Fensterkontakt sind bereits eingerichtet."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "score": { "name": "Lüftungsbewertung" },
+      "room_score": { "name": "{room} Lüftungsbewertung" },
+      "indoor_temperature": { "name": "Innentemperatur" },
+      "last_cooldown": { "name": "Letzte Abkühlung" },
+      "room_cooldown": { "name": "{room} Abkühlung" },
+      "cooldown_today": { "name": "Abkühlung heute" }
+    },
+    "binary_sensor": {
+      "airing_recommended": { "name": "Lüften empfohlen" },
+      "airing_active": { "name": "Lüftung läuft" }
+    }
+  }
+}
