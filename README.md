@@ -6,8 +6,8 @@ It compares each room against the outdoor conditions, scores the flat from 0 to 
 by room, and — because every window in the flat has a contact sensor — notices when you actually air
 out and reports how much cooler it got, in total and per room.
 
-Three dashboard cards ship with the integration, so it is one HACS install and no Lovelace resource
-to add by hand.
+Three dashboard cards and a badge ship with the integration, so it is one HACS install and no
+Lovelace resource to add by hand.
 
 ## What you get
 
@@ -91,8 +91,33 @@ show_names: false        # optional
 rooms: [living_room, bedroom] # optional, defaults to all
 ```
 
-Chip and gauge colours come from `--stosslueft-good`, `--stosslueft-neutral` and `--stosslueft-bad`,
-so a theme can override them.
+**`stosslueft-badge`** — a badge for a view's badge row, showing either the whole flat or one room.
+Add several to get one per room. It appears in the *Add badge* picker, not the card picker.
+
+```yaml
+type: custom:stosslueft-badge
+entity: sensor.stossluften_airing_score
+room: living_room # optional, omit for the whole flat
+show_name: true   # optional
+```
+
+Badge, chip and gauge colours come from `--stosslueft-good`, `--stosslueft-neutral` and
+`--stosslueft-bad`, so a theme can override them.
+
+### Badges in a section heading
+
+Home Assistant's heading cards accept only their own *entity* and *button* heading badges — there is
+no registry for custom ones, so `custom:stosslueft-badge` cannot go inside a section heading. Use a
+built-in entity heading badge pointed straight at a room's score sensor instead, which needs no code
+from this integration:
+
+```yaml
+type: heading
+heading: Wohnzimmer
+badges:
+  - type: entity
+    entity: sensor.stossluften_living_room_airing_score
+```
 
 ## How the score works
 
