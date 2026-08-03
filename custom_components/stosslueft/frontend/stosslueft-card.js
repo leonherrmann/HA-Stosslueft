@@ -6,7 +6,7 @@
  * single sensor (`sensor.*_airing_score`), so the card only needs one entity.
  */
 
-const CARD_VERSION = "0.1.0";
+const CARD_VERSION = "0.2.0";
 
 const RATING_COLORS = {
   good: "var(--stosslueft-good, #2e7d32)",
@@ -614,6 +614,92 @@ class StoslueftChipsCard extends StoslueftBaseCard {
   }
 }
 
+/**
+ * A single badge for the view's badge row: the whole flat, or one room.
+ *
+ * Note this is a *badge*, not a card, and it only works in a view's `badges:`
+ * list. Home Assistant's heading cards accept their own entity and button
+ * heading badges only -- there is no registry for custom ones -- so for a
+ * badge inside a section heading, point a built-in entity heading badge at
+ * `sensor.*_<room>_airing_score` instead.
+ */
+class StoslueftBadge extends StoslueftBaseCard {
+  static defaults = { show_name: true };
+
+  static getStubConfig(hass) {
+    return { entity: StoslueftBaseCard.findScoreEntity(hass) };
+  }
+
+  static getConfigElement() {
+    return document.createElement("stosslueft-badge-editor");
+  }
+
+  _unavailable() {
+    return `${this._styles()}<div class="badge"><span class="muted">–</span></div>`;
+  }
+
+  _body(state) {
+    const strings = this._t();
+    const attributes = state.attributes;
+    const roomId = this._config.room;
+
+    let view;
+    if (roomId) {
+      const room = (attributes.rooms || []).find(
+        (candidate) => candidate.room_id === roomId,
+      );
+      if (!room) return this._unavailable();
+      view = {
+        label: this._config.name ?? room.name,
+        score: room.score,
+        rating: room.rating,
+        entity: room.temperature_entity,
+        icon: room.window_open
+          ? "mdi:window-open-variant"
+          : "mdi:window-closed-variant",
+      };
+    } else {
+      view = {
+        label: this._config.name ?? strings.title,
+        score: state.state,
+        rating: attributes.rating,
+        entity: this._config.entity,
+        icon: attributes.airing_active
+          ? "mdi:weather-windy"
+          : "mdi:home-thermometer-outline",
+      };
+    }
+
+    const color = ratingColor(view.rating);
+    return `${this._styles()}
+      <div class="badge${view.entity ? " clickable" : ""}"
+           ${view.entity ? `data-entity="${escapeHtml(view.entity)}"` : ""}
+           title="${escapeHtml(view.label)}">
+        <ha-icon icon="${escapeHtml(view.icon)}" style="color:${color}"></ha-icon>
+        <span class="value" style="color:${color}">${escapeHtml(view.score ?? "–")}</span>
+        ${this._config.show_name ? `<span class="label">${escapeHtml(view.label)}</span>` : ""}
+      </div>`;
+  }
+
+  _styles() {
+    return `<style>
+      :host { display: inline-block; }
+      .badge { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
+               border-radius: 18px; box-sizing: border-box;
+               background: var(--ha-card-background, var(--card-background-color, #fff));
+               box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,.12));
+               border: var(--ha-card-border-width, 1px) solid transparent;
+               color: var(--primary-text-color, #212121); font-size: 14px; line-height: 1; }
+      .badge.clickable { cursor: pointer; }
+      .badge.clickable:hover { background: var(--secondary-background-color, #f5f5f5); }
+      ha-icon { --mdc-icon-size: 18px; flex: none; }
+      .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+      .label { color: var(--secondary-text-color, #727272); white-space: nowrap; }
+      .muted { color: var(--secondary-text-color, #727272); }
+    </style>`;
+  }
+}
+
 const EDITOR_LABELS = {
   entity: "Airing score sensor",
   name: "Title",
@@ -623,6 +709,8 @@ const EDITOR_LABELS = {
   show_overall: "Show a chip for the whole flat",
   show_names: "Show room names on the chips",
   rooms: "Rooms (leave empty for all)",
+  room: "Room (leave empty for the whole flat)",
+  show_name: "Show the name",
 };
 
 const ENTITY_FIELD = {
@@ -666,9 +754,20 @@ class StoslueftEditorBase extends HTMLElement {
       this.appendChild(this._form);
     }
     this._form.hass = this._hass;
-    this._form.schema = this.constructor.schema;
+    this._form.schema = this._schema();
     this._form.data = { ...this.constructor.defaults, ...this._config };
   }
+
+  /** Overridden where the schema depends on the picked entity. */
+  _schema() {
+    return this.constructor.schema;
+  }
+}
+
+/** Offer the configured rooms as a dropdown, read off the score sensor. */
+function roomOptions(hass, entityId) {
+  const rooms = hass?.states?.[entityId]?.attributes?.rooms || [];
+  return rooms.map((room) => ({ value: room.room_id, label: room.name }));
 }
 
 class StoslueftCardEditor extends StoslueftEditorBase {
@@ -698,6 +797,35 @@ class StoslueftChipsCardEditor extends StoslueftEditorBase {
     { name: "show_overall", selector: { boolean: {} } },
     { name: "show_names", selector: { boolean: {} } },
   ];
+
+  _schema() {
+    const options = roomOptions(this._hass, this._config?.entity);
+    if (!options.length) return this.constructor.schema;
+    return [
+      ...this.constructor.schema,
+      { name: "rooms", selector: { select: { options, multiple: true } } },
+    ];
+  }
+}
+
+class StoslueftBadgeEditor extends StoslueftEditorBase {
+  static defaults = StoslueftBadge.defaults;
+  static schema = [
+    ENTITY_FIELD,
+    { name: "name", selector: { text: {} } },
+    { name: "show_name", selector: { boolean: {} } },
+  ];
+
+  _schema() {
+    const options = roomOptions(this._hass, this._config?.entity);
+    if (!options.length) return this.constructor.schema;
+    // Inserted after the entity so the room reads as a narrowing of it.
+    return [
+      ENTITY_FIELD,
+      { name: "room", selector: { select: { options } } },
+      ...this.constructor.schema.slice(1),
+    ];
+  }
 }
 
 const CARDS = [
@@ -725,6 +853,8 @@ const CARDS = [
   },
 ];
 
+const DOCS_URL = "https://github.com/leonherrmann/HA-Stosslueft";
+
 if (!customElements.get("stosslueft-card")) {
   window.customCards = window.customCards || [];
   for (const card of CARDS) {
@@ -735,9 +865,22 @@ if (!customElements.get("stosslueft-card")) {
       name: card.name,
       description: card.description,
       preview: true,
-      documentationURL: "https://github.com/leonherrmann/HA-Stosslueft",
+      documentationURL: DOCS_URL,
     });
   }
+
+  // Badges live in their own registry and only work in a view's `badges:`
+  // list -- heading cards accept built-in heading badges only.
+  customElements.define("stosslueft-badge", StoslueftBadge);
+  customElements.define("stosslueft-badge-editor", StoslueftBadgeEditor);
+  window.customBadges = window.customBadges || [];
+  window.customBadges.push({
+    type: "stosslueft-badge",
+    name: "Stoßlüften",
+    description: "Airing score for the flat, or for one room.",
+    preview: true,
+    documentationURL: DOCS_URL,
+  });
 
   console.info(
     `%c STOSSLUEFT-CARD %c ${CARD_VERSION} `,
