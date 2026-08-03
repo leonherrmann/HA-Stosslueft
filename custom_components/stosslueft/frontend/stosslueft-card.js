@@ -6,7 +6,7 @@
  * single sensor (`sensor.*_airing_score`), so the card only needs one entity.
  */
 
-const CARD_VERSION = "0.1.0";
+const CARD_VERSION = "0.2.0";
 
 const RATING_COLORS = {
   good: "var(--stosslueft-good, #2e7d32)",
