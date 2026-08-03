@@ -62,12 +62,13 @@ RAINY_CONDITIONS: Final = frozenset(
 )
 RAIN_SCORE_CAP: Final = 40
 
-# Rating thresholds, best first
+# Rating thresholds, best first. Three levels on purpose: the useful question
+# is "open the windows or not", and five shades of that were just noise. The
+# 0-100 number is still there underneath for automations and for telling two
+# good moments apart.
 RATING_THRESHOLDS: Final = (
-    (80, "excellent"),
     (65, "good"),
-    (50, "fair"),
-    (35, "poor"),
+    (35, "neutral"),
     (0, "bad"),
 )
 

@@ -37,7 +37,8 @@ async def test_full_session_reports_cooldown(
     assert active.state == "on"
     assert active.attributes["open_rooms"] == ["Bedroom", "Living room"]
 
-    # Everything cools down, including the hallway which has no window contact.
+    # The hallway cools too, but it has no window contact of its own, so it
+    # must not dilute the figure.
     set_state("sensor.living_room_temperature", "22.5")
     set_state("sensor.bedroom_temperature", "22")
     set_state("sensor.hallway_temperature", "23")
@@ -55,20 +56,22 @@ async def test_full_session_reports_cooldown(
 
     assert len(events) == 1
     payload = events[0].data
-    assert payload["delta"] == 2.5  # (3.5 + 3.0 + 1.0) / 3
+    assert payload["delta"] == 3.25  # (3.5 + 3.0) / 2, the hallway is left out
     assert payload["duration_minutes"] > 19
     rooms = {room["room_id"]: room for room in payload["rooms"]}
     assert rooms["living_room"]["delta"] == 3.5
     assert rooms["living_room"]["aired"] is True
-    assert rooms["hallway"]["delta"] == 1.0
-    assert rooms["hallway"]["aired"] is False
+    assert "hallway" not in rooms
 
-    assert hass.states.get("sensor.stossluften_last_airing_cooldown").state == "2.5"
+    assert hass.states.get("sensor.stossluften_last_airing_cooldown").state == "3.25"
     assert (
         hass.states.get("sensor.stossluften_living_room_airing_cooldown").state == "3.5"
     )
-    assert hass.states.get("sensor.stossluften_hallway_airing_cooldown").state == "1.0"
-    assert hass.states.get("sensor.stossluften_airing_cooldown_today").state == "2.5"
+    # A room with no window gets no cooldown sensor at all...
+    assert hass.states.get("sensor.stossluften_hallway_airing_cooldown") is None
+    # ...but is still scored and still counts toward the overall score.
+    assert hass.states.get("sensor.stossluften_hallway_airing_score") is not None
+    assert hass.states.get("sensor.stossluften_airing_cooldown_today").state == "3.25"
     assert hass.states.get("binary_sensor.stossluften_airing_active").state == "off"
 
 
@@ -155,8 +158,8 @@ async def test_night_flag_and_live_progress(
     assert active.state == "on"
     assert active.attributes["at_night"] is True
     assert active.attributes["open_rooms"] == ["Living room"]
-    # (26-24 + 25-24 + 24-23.5) / 3
-    assert active.attributes["cooldown_so_far"] == 1.17
+    # (26-24 + 25-24) / 2 -- the windowless hallway is not counted
+    assert active.attributes["cooldown_so_far"] == 1.5
 
 
 async def test_session_survives_a_restart(

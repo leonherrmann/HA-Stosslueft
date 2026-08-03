@@ -53,7 +53,7 @@ async def test_scores_a_warm_evening(
     overall = hass.states.get("sensor.stossluften_airing_score")
     assert overall is not None
     assert int(overall.state) > 80
-    assert overall.attributes["rating"] == "excellent"
+    assert overall.attributes["rating"] == "good"
     assert overall.attributes["indoor_temperature"] == 25.0
     assert overall.attributes["outdoor_temperature"] == 18.0
     assert overall.attributes["temperature_delta"] == -7.0

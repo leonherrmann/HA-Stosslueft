@@ -610,9 +610,14 @@ class StoslueftCoordinator(DataUpdateCoordinator[StoslueftData]):
                     self.config_entry.data.get(CONF_OUTDOOR_TEMPERATURE)
                 ),
             )
-            # Snapshot every room, not just the ones with an open window: the
-            # whole flat cools down, and the user asked for the whole flat.
+            # Snapshot every room that has a window of its own, not only the
+            # ones open right now -- the rest of the flat cools during the
+            # same airing. Rooms with no window contact are interior rooms
+            # that are never aired directly, so counting them would only
+            # water down the figure.
             for room in self.rooms:
+                if room.window_entity is None:
+                    continue
                 temperature = self._temperature(room.temperature_entity)
                 self._active.rooms[room.room_id] = RoomSessionRecord(
                     room_id=room.room_id,

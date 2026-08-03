@@ -39,7 +39,9 @@ async def async_setup_entry(
     ]
     for room in coordinator.rooms:
         entities.append(RoomScoreSensor(coordinator, room))
-        if room.temperature_entity:
+        # No window contact means the room is never aired directly, so there
+        # is no cooldown to attribute to it -- but it is still scored above.
+        if room.temperature_entity and room.window_entity:
             entities.append(RoomCooldownSensor(coordinator, room))
     async_add_entities(entities)
 
