@@ -9,12 +9,14 @@
 const CARD_VERSION = "0.1.0";
 
 const RATING_COLORS = {
-  excellent: "var(--stosslueft-excellent, #2e7d32)",
-  good: "var(--stosslueft-good, #689f38)",
-  fair: "var(--stosslueft-fair, #f9a825)",
-  poor: "var(--stosslueft-poor, #ef6c00)",
+  good: "var(--stosslueft-good, #2e7d32)",
+  neutral: "var(--stosslueft-neutral, #f9a825)",
   bad: "var(--stosslueft-bad, #c62828)",
 };
+
+function ratingColor(rating) {
+  return RATING_COLORS[rating] || RATING_COLORS.bad;
+}
 
 const TRANSLATIONS = {
   en: {
@@ -33,19 +35,17 @@ const TRANSLATIONS = {
     today: "Today",
     unavailable: "Airing score unavailable",
     ratings: {
-      excellent: "Excellent",
       good: "Good",
-      fair: "Mixed",
-      poor: "Poor",
+      neutral: "Neutral",
       bad: "Bad",
     },
     reasons: {
       no_data: "No temperature data",
       rain: "It is raining — windows stay shut",
-      cooling_available: "{delta} K cooler outside, {duration} min is enough",
-      warming_available: "{delta} K warmer outside, airing warms the room",
-      too_warm_outside: "{delta} K warmer outside — would heat the flat up",
-      heat_loss: "{delta} K colder outside — would just waste heat",
+      cooling_available: "{delta} °C cooler outside, {duration} min is enough",
+      warming_available: "{delta} °C warmer outside, airing warms the room",
+      too_warm_outside: "{delta} °C warmer outside — would heat the flat up",
+      heat_loss: "{delta} °C colder outside — would just waste heat",
       drying: "Damp inside ({humidity} %), the outside air is drier",
       would_add_moisture:
         "Damp inside ({humidity} %), but outside air is wetter still",
@@ -68,19 +68,17 @@ const TRANSLATIONS = {
     today: "Heute",
     unavailable: "Lüftungsbewertung nicht verfügbar",
     ratings: {
-      excellent: "Ausgezeichnet",
       good: "Gut",
-      fair: "Mittel",
-      poor: "Schlecht",
-      bad: "Nicht lüften",
+      neutral: "Neutral",
+      bad: "Schlecht",
     },
     reasons: {
       no_data: "Keine Temperaturdaten",
       rain: "Es regnet — Fenster bleiben zu",
-      cooling_available: "{delta} K kühler draußen, {duration} Min. reichen",
-      warming_available: "{delta} K wärmer draußen, Lüften wärmt den Raum",
-      too_warm_outside: "{delta} K wärmer draußen — würde die Wohnung aufheizen",
-      heat_loss: "{delta} K kälter draußen — würde nur Wärme verschwenden",
+      cooling_available: "{delta} °C kühler draußen, {duration} Min. reichen",
+      warming_available: "{delta} °C wärmer draußen, Lüften wärmt den Raum",
+      too_warm_outside: "{delta} °C wärmer draußen — würde die Wohnung aufheizen",
+      heat_loss: "{delta} °C kälter draußen — würde nur Wärme verschwenden",
       drying: "Feucht drinnen ({humidity} %), die Außenluft ist trockener",
       would_add_moisture:
         "Feucht drinnen ({humidity} %), aber die Außenluft ist noch feuchter",
@@ -123,7 +121,14 @@ function minutesSince(isoString) {
   return Math.max(0, Math.round((Date.now() - started) / 60000));
 }
 
-class StoslueftCard extends HTMLElement {
+/**
+ * Shared plumbing for every card in this file: config handling, looking the
+ * score sensor up, translations, and only redrawing when something moved.
+ * Subclasses implement `_body(state)` and the static `defaults`.
+ */
+class StoslueftBaseCard extends HTMLElement {
+  static defaults = {};
+
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
@@ -132,25 +137,23 @@ class StoslueftCard extends HTMLElement {
     this._lastRendered = null;
   }
 
-  static getStubConfig(hass) {
-    const entity = Object.keys(hass.states).find(
-      (entityId) =>
-        entityId.startsWith("sensor.") &&
-        hass.states[entityId].attributes.rooms !== undefined &&
-        hass.states[entityId].attributes.recommend_threshold !== undefined,
+  /** Find an airing score sensor to preselect in the card picker. */
+  static findScoreEntity(hass) {
+    return (
+      Object.keys(hass.states).find(
+        (entityId) =>
+          entityId.startsWith("sensor.") &&
+          hass.states[entityId].attributes.rooms !== undefined &&
+          hass.states[entityId].attributes.recommend_threshold !== undefined,
+      ) || ""
     );
-    return { type: "custom:stosslueft-card", entity: entity || "" };
-  }
-
-  static getConfigElement() {
-    return document.createElement("stosslueft-card-editor");
   }
 
   setConfig(config) {
     if (!config || !config.entity) {
       throw new Error("You need to pick the airing score sensor.");
     }
-    this._config = { show_rooms: true, show_last_session: true, ...config };
+    this._config = { ...this.constructor.defaults, ...config };
     this._lastRendered = null;
     if (this._hass) this._render();
   }
@@ -158,11 +161,6 @@ class StoslueftCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     this._render();
-  }
-
-  getCardSize() {
-    const rooms = this._state()?.attributes.rooms?.length ?? 0;
-    return 4 + (this._config.show_rooms ? Math.ceil(rooms / 2) : 0);
   }
 
   _state() {
@@ -190,32 +188,17 @@ class StoslueftCard extends HTMLElement {
   _render() {
     const state = this._state();
     if (!state) {
-      this.shadowRoot.innerHTML = this._shell(
-        `<div class="unavailable">${escapeHtml(this._t().unavailable)}</div>`,
-      );
+      this.shadowRoot.innerHTML = this._unavailable();
       return;
     }
 
     // Redrawing on every hass update would fight with the user opening the
-    // last-airing details, so only redraw when this entity actually moved.
-    const fingerprint = `${state.last_updated}|${this._hass.locale?.language}`;
+    // last-airing details, so only redraw when something actually moved.
+    const fingerprint = `${state.last_updated}|${this._hass.locale?.language}|${JSON.stringify(this._config)}`;
     if (fingerprint === this._lastRendered) return;
     this._lastRendered = fingerprint;
 
-    const attributes = state.attributes;
-    const score = Number(state.state);
-    const rating = attributes.rating || "bad";
-    const color = RATING_COLORS[rating] || RATING_COLORS.bad;
-
-    this.shadowRoot.innerHTML = this._shell(
-      [
-        this._gauge(score, rating, color, attributes),
-        this._stats(attributes),
-        this._banner(attributes),
-        this._config.show_rooms ? this._rooms(attributes) : "",
-        this._config.show_last_session ? this._lastSession(attributes) : "",
-      ].join(""),
-    );
+    this.shadowRoot.innerHTML = this._body(state);
 
     this.shadowRoot.querySelectorAll("[data-entity]").forEach((element) => {
       element.addEventListener("click", () => {
@@ -228,6 +211,47 @@ class StoslueftCard extends HTMLElement {
         );
       });
     });
+  }
+}
+
+class StoslueftCard extends StoslueftBaseCard {
+  static defaults = { show_rooms: true, show_last_session: true };
+
+  static getStubConfig(hass) {
+    return {
+      type: "custom:stosslueft-card",
+      entity: StoslueftBaseCard.findScoreEntity(hass),
+    };
+  }
+
+  static getConfigElement() {
+    return document.createElement("stosslueft-card-editor");
+  }
+
+  getCardSize() {
+    const rooms = this._state()?.attributes.rooms?.length ?? 0;
+    return 4 + (this._config.show_rooms ? Math.ceil(rooms / 2) : 0);
+  }
+
+  _unavailable() {
+    return this._shell(
+      `<div class="unavailable">${escapeHtml(this._t().unavailable)}</div>`,
+    );
+  }
+
+  _body(state) {
+    const attributes = state.attributes;
+    const rating = attributes.rating || "bad";
+    const color = ratingColor(rating);
+    return this._shell(
+      [
+        this._gauge(Number(state.state), rating, color, attributes),
+        this._stats(attributes),
+        this._banner(attributes),
+        this._config.show_rooms ? this._rooms(attributes) : "",
+        this._config.show_last_session ? this._lastSession(attributes) : "",
+      ].join(""),
+    );
   }
 
   _shell(content) {
@@ -266,7 +290,7 @@ class StoslueftCard extends HTMLElement {
     const items = [
       [strings.inside, `${formatNumber(attributes.indoor_temperature)} °C`],
       [strings.outside, `${formatNumber(attributes.outdoor_temperature)} °C`],
-      [strings.difference, `${formatSigned(attributes.temperature_delta)} K`],
+      [strings.difference, `${formatSigned(attributes.temperature_delta)} °C`],
       [
         strings.suggested,
         `${attributes.duration_minutes ?? "–"} ${strings.minutes}`,
@@ -301,7 +325,7 @@ class StoslueftCard extends HTMLElement {
     const elapsed = minutesSince(session.started);
     if (elapsed !== null) parts.push(`${elapsed} ${strings.minutes}`);
     if (average !== null)
-      parts.push(`−${formatNumber(average)} K ${strings.so_far}`);
+      parts.push(`−${formatNumber(average)} °C ${strings.so_far}`);
 
     const openRooms = (session.open_rooms || [])
       .map((roomId) => rooms.find((room) => room.room_id === roomId))
@@ -333,7 +357,7 @@ class StoslueftCard extends HTMLElement {
   }
 
   _roomRow(room) {
-    const color = RATING_COLORS[room.rating] || RATING_COLORS.bad;
+    const color = ratingColor(room.rating);
     const score = typeof room.score === "number" ? room.score : 0;
     const clickable = room.temperature_entity
       ? ` data-entity="${escapeHtml(room.temperature_entity)}"`
@@ -341,7 +365,7 @@ class StoslueftCard extends HTMLElement {
     const cooldown =
       typeof room.last_cooldown === "number" &&
       Math.abs(room.last_cooldown) >= 0.05
-        ? `<span class="chip">−${formatNumber(room.last_cooldown)} K</span>`
+        ? `<span class="chip">−${formatNumber(room.last_cooldown)} °C</span>`
         : "";
     return `
       <div class="room${clickable ? " clickable" : ""}"${clickable}>
@@ -369,15 +393,15 @@ class StoslueftCard extends HTMLElement {
       <details class="section last">
         <summary>
           <span>${escapeHtml(strings.last_airing)}${escapeHtml(when)}</span>
-          <span class="summary-value">−${formatNumber(session.delta)} K · ${Math.round(session.duration_minutes ?? 0)} ${escapeHtml(strings.minutes)}</span>
+          <span class="summary-value">−${formatNumber(session.delta)} °C · ${Math.round(session.duration_minutes ?? 0)} ${escapeHtml(strings.minutes)}</span>
         </summary>
         ${rooms
           .map(
             (room) =>
-              `<div class="last-room"><span>${escapeHtml(room.name)}</span><span>−${formatNumber(room.delta)} K</span></div>`,
+              `<div class="last-room"><span>${escapeHtml(room.name)}</span><span>−${formatNumber(room.delta)} °C</span></div>`,
           )
           .join("")}
-        <div class="last-room total"><span>${escapeHtml(strings.today)}</span><span>−${formatNumber(attributes.cooldown_today)} K</span></div>
+        <div class="last-room total"><span>${escapeHtml(strings.today)}</span><span>−${formatNumber(attributes.cooldown_today)} °C</span></div>
       </details>`;
   }
 
@@ -430,7 +454,190 @@ class StoslueftCard extends HTMLElement {
   }
 }
 
-class StoslueftCardEditor extends HTMLElement {
+/** One row: verdict, score and the two temperatures. No gauge, no rooms. */
+class StoslueftCompactCard extends StoslueftBaseCard {
+  static defaults = { show_score: true };
+
+  static getStubConfig(hass) {
+    return {
+      type: "custom:stosslueft-compact-card",
+      entity: StoslueftBaseCard.findScoreEntity(hass),
+    };
+  }
+
+  static getConfigElement() {
+    return document.createElement("stosslueft-compact-card-editor");
+  }
+
+  getCardSize() {
+    return 1;
+  }
+
+  _unavailable() {
+    return `${this._styles()}<ha-card><div class="row"><span class="muted">${escapeHtml(this._t().unavailable)}</span></div></ha-card>`;
+  }
+
+  _body(state) {
+    const strings = this._t();
+    const attributes = state.attributes;
+    const rating = attributes.rating || "bad";
+    const color = ratingColor(rating);
+    const airing = attributes.airing_active;
+
+    return `${this._styles()}
+      <ha-card>
+        <div class="row" data-entity="${escapeHtml(this._config.entity)}"
+             title="${escapeHtml(this._reasonText(attributes))}">
+          <ha-icon icon="mdi:window-open-variant" style="color:${color}"></ha-icon>
+          ${this._config.name ? `<span class="name">${escapeHtml(this._config.name)}</span>` : ""}
+          <span class="verdict" style="color:${color}">${escapeHtml(strings.ratings[rating] || rating)}</span>
+          ${this._config.show_score ? `<span class="score">${escapeHtml(state.state)}</span>` : ""}
+          <span class="spacer"></span>
+          ${airing ? '<ha-icon class="airing" icon="mdi:weather-windy"></ha-icon>' : ""}
+          <span class="temps">
+            ${formatNumber(attributes.indoor_temperature)}
+            <span class="arrow">→</span>
+            ${formatNumber(attributes.outdoor_temperature)} °C
+          </span>
+        </div>
+      </ha-card>`;
+  }
+
+  _styles() {
+    return `<style>
+      .row { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer;
+             color: var(--primary-text-color, #212121); }
+      .row:hover { background: var(--secondary-background-color, #f5f5f5); }
+      ha-icon { --mdc-icon-size: 24px; flex: none; }
+      .name { font-weight: 500; }
+      .verdict { font-weight: 600; }
+      .score { color: var(--secondary-text-color, #727272); font-size: 14px; }
+      .spacer { flex: 1; }
+      .airing { color: var(--info-color, #039be5); --mdc-icon-size: 18px; }
+      .temps { white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .arrow { color: var(--secondary-text-color, #727272); margin: 0 2px; }
+      .muted { color: var(--secondary-text-color, #727272); }
+    </style>`;
+  }
+}
+
+/** A row of traffic-light chips: the flat, then one per room. */
+class StoslueftChipsCard extends StoslueftBaseCard {
+  static defaults = { show_overall: true, show_names: false };
+
+  static getStubConfig(hass) {
+    return {
+      type: "custom:stosslueft-chips-card",
+      entity: StoslueftBaseCard.findScoreEntity(hass),
+    };
+  }
+
+  static getConfigElement() {
+    return document.createElement("stosslueft-chips-card-editor");
+  }
+
+  getCardSize() {
+    return 1;
+  }
+
+  _unavailable() {
+    return `${this._styles()}<div class="chips"><span class="muted">${escapeHtml(this._t().unavailable)}</span></div>`;
+  }
+
+  _body(state) {
+    const strings = this._t();
+    const attributes = state.attributes;
+    const wanted = this._config.rooms;
+    const rooms = (attributes.rooms || []).filter(
+      (room) => !Array.isArray(wanted) || wanted.includes(room.room_id),
+    );
+
+    const chips = [];
+    if (this._config.show_overall) {
+      chips.push(
+        this._chip({
+          label: this._config.name ?? strings.title,
+          score: state.state,
+          rating: attributes.rating,
+          entity: this._config.entity,
+          icon: attributes.airing_active
+            ? "mdi:weather-windy"
+            : "mdi:home-thermometer-outline",
+          showLabel: true,
+        }),
+      );
+    }
+    for (const room of rooms) {
+      chips.push(
+        this._chip({
+          label: room.name,
+          score: room.score,
+          rating: room.rating,
+          entity: room.temperature_entity,
+          icon: room.window_open
+            ? "mdi:window-open-variant"
+            : "mdi:window-closed-variant",
+          showLabel: this._config.show_names,
+        }),
+      );
+    }
+    return `${this._styles()}<div class="chips">${chips.join("")}</div>`;
+  }
+
+  _chip({ label, score, rating, entity, icon, showLabel }) {
+    const color = ratingColor(rating);
+    const clickable = entity ? ` data-entity="${escapeHtml(entity)}"` : "";
+    // The name is always in the tooltip, even when it is not on screen --
+    // otherwise a row of icons is unreadable.
+    return `
+      <div class="chip${entity ? " clickable" : ""}"${clickable} title="${escapeHtml(label)}">
+        <ha-icon icon="${escapeHtml(icon)}" style="color:${color}"></ha-icon>
+        ${showLabel ? `<span class="label">${escapeHtml(label)}</span>` : ""}
+        <span class="score" style="color:${color}">${escapeHtml(score ?? "–")}</span>
+      </div>`;
+  }
+
+  _styles() {
+    return `<style>
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
+              border-radius: 18px; background: var(--ha-card-background, var(--card-background-color, #fff));
+              box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,.12));
+              color: var(--primary-text-color, #212121); font-size: 14px; }
+      .chip.clickable { cursor: pointer; }
+      .chip.clickable:hover { background: var(--secondary-background-color, #f5f5f5); }
+      ha-icon { --mdc-icon-size: 20px; flex: none; }
+      .label { white-space: nowrap; }
+      .score { font-weight: 600; font-variant-numeric: tabular-nums; }
+      .muted { color: var(--secondary-text-color, #727272); }
+    </style>`;
+  }
+}
+
+const EDITOR_LABELS = {
+  entity: "Airing score sensor",
+  name: "Title",
+  show_rooms: "Show the room breakdown",
+  show_last_session: "Show the last airing",
+  show_score: "Show the score number",
+  show_overall: "Show a chip for the whole flat",
+  show_names: "Show room names on the chips",
+  rooms: "Rooms (leave empty for all)",
+};
+
+const ENTITY_FIELD = {
+  name: "entity",
+  required: true,
+  selector: {
+    entity: { filter: [{ integration: "stosslueft", domain: "sensor" }] },
+  },
+};
+
+/** Visual editor driven by an `ha-form` schema the subclass supplies. */
+class StoslueftEditorBase extends HTMLElement {
+  static schema = [ENTITY_FIELD];
+  static defaults = {};
+
   setConfig(config) {
     this._config = config;
     this._update();
@@ -446,12 +653,7 @@ class StoslueftCardEditor extends HTMLElement {
     if (!this._form) {
       this._form = document.createElement("ha-form");
       this._form.computeLabel = (schema) =>
-        ({
-          entity: "Airing score sensor",
-          name: "Title",
-          show_rooms: "Show the room breakdown",
-          show_last_session: "Show the last airing",
-        })[schema.name] || schema.name;
+        EDITOR_LABELS[schema.name] || schema.name;
       this._form.addEventListener("value-changed", (event) => {
         this.dispatchEvent(
           new CustomEvent("config-changed", {
@@ -464,39 +666,78 @@ class StoslueftCardEditor extends HTMLElement {
       this.appendChild(this._form);
     }
     this._form.hass = this._hass;
-    this._form.schema = [
-      {
-        name: "entity",
-        required: true,
-        selector: {
-          entity: { filter: [{ integration: "stosslueft", domain: "sensor" }] },
-        },
-      },
-      { name: "name", selector: { text: {} } },
-      { name: "show_rooms", selector: { boolean: {} } },
-      { name: "show_last_session", selector: { boolean: {} } },
-    ];
-    this._form.data = {
-      show_rooms: true,
-      show_last_session: true,
-      ...this._config,
-    };
+    this._form.schema = this.constructor.schema;
+    this._form.data = { ...this.constructor.defaults, ...this._config };
   }
 }
 
-if (!customElements.get("stosslueft-card")) {
-  customElements.define("stosslueft-card", StoslueftCard);
-  customElements.define("stosslueft-card-editor", StoslueftCardEditor);
+class StoslueftCardEditor extends StoslueftEditorBase {
+  static defaults = StoslueftCard.defaults;
+  static schema = [
+    ENTITY_FIELD,
+    { name: "name", selector: { text: {} } },
+    { name: "show_rooms", selector: { boolean: {} } },
+    { name: "show_last_session", selector: { boolean: {} } },
+  ];
+}
 
-  window.customCards = window.customCards || [];
-  window.customCards.push({
-    type: "stosslueft-card",
+class StoslueftCompactCardEditor extends StoslueftEditorBase {
+  static defaults = StoslueftCompactCard.defaults;
+  static schema = [
+    ENTITY_FIELD,
+    { name: "name", selector: { text: {} } },
+    { name: "show_score", selector: { boolean: {} } },
+  ];
+}
+
+class StoslueftChipsCardEditor extends StoslueftEditorBase {
+  static defaults = StoslueftChipsCard.defaults;
+  static schema = [
+    ENTITY_FIELD,
+    { name: "name", selector: { text: {} } },
+    { name: "show_overall", selector: { boolean: {} } },
+    { name: "show_names", selector: { boolean: {} } },
+  ];
+}
+
+const CARDS = [
+  {
+    tag: "stosslueft-card",
+    element: StoslueftCard,
+    editor: StoslueftCardEditor,
     name: "Stoßlüften",
     description:
       "Shows whether it is worth opening every window, room by room, and what the last airing achieved.",
-    preview: true,
-    documentationURL: "https://github.com/leonherrmann/HA-Stosslueft",
-  });
+  },
+  {
+    tag: "stosslueft-compact-card",
+    element: StoslueftCompactCard,
+    editor: StoslueftCompactCardEditor,
+    name: "Stoßlüften (compact)",
+    description: "One row: the verdict, the score and inside vs. outside.",
+  },
+  {
+    tag: "stosslueft-chips-card",
+    element: StoslueftChipsCard,
+    editor: StoslueftChipsCardEditor,
+    name: "Stoßlüften (chips)",
+    description: "A traffic-light chip for the flat and one for every room.",
+  },
+];
+
+if (!customElements.get("stosslueft-card")) {
+  window.customCards = window.customCards || [];
+  for (const card of CARDS) {
+    customElements.define(card.tag, card.element);
+    customElements.define(`${card.tag}-editor`, card.editor);
+    window.customCards.push({
+      type: card.tag,
+      name: card.name,
+      description: card.description,
+      preview: true,
+      documentationURL: "https://github.com/leonherrmann/HA-Stosslueft",
+    });
+  }
 
   console.info(
     `%c STOSSLUEFT-CARD %c ${CARD_VERSION} `,

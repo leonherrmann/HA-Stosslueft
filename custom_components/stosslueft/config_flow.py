@@ -81,7 +81,7 @@ def _settings_schema(options: dict[str, Any]) -> vol.Schema:
                 default=options.get(CONF_COMFORT_BAND, DEFAULT_COMFORT_BAND),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=0, max=5, step=0.1, unit_of_measurement="K"
+                    min=0, max=5, step=0.1, unit_of_measurement="°C"
                 )
             ),
             vol.Required(

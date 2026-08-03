@@ -6,8 +6,8 @@ It compares each room against the outdoor conditions, scores the flat from 0 to 
 by room, and — because every window in the flat has a contact sensor — notices when you actually air
 out and reports how much cooler it got, in total and per room.
 
-A dashboard card ships with the integration, so it is one HACS install and no Lovelace resource to
-add by hand.
+Three dashboard cards ship with the integration, so it is one HACS install and no Lovelace resource
+to add by hand.
 
 ## What you get
 
@@ -17,7 +17,7 @@ add by hand.
 | `sensor.<name>_<room>_airing_score` | Per-room score, with the reasoning in its attributes. |
 | `sensor.<name>_indoor_temperature` | Average across all configured rooms. |
 | `sensor.<name>_last_airing_cooldown` | How much the flat cooled during the last airing, with the per-room breakdown. |
-| `sensor.<name>_<room>_airing_cooldown` | The same figure per room, so you can graph it. |
+| `sensor.<name>_<room>_airing_cooldown` | The same figure per room, so you can graph it. Only for rooms that have a window contact. |
 | `sensor.<name>_airing_cooldown_today` | Sum of every session since midnight. |
 | `binary_sensor.<name>_airing_recommended` | On when the score clears your threshold. |
 | `binary_sensor.<name>_airing_active` | On while a window is open, with live progress. |
@@ -52,22 +52,47 @@ Setup asks two things:
 Everything is editable afterwards under *Configure*: the tuning knobs, the individual rooms and their
 sensors, and a *Look for new rooms* action that re-runs the scan.
 
-## The card
+## The cards
 
-Add *Stoßlüften* from the card picker. It only needs the overall score sensor:
+All three appear in the card picker, all three need only the overall score sensor, and all three read
+everything else from its attributes. English and German are built in; they follow your Home Assistant
+language.
+
+**`stosslueft-card`** — the full card: gauge with a tick at your recommendation threshold, the
+indoor/outdoor comparison and suggested duration, a live banner while a window is open, the per-room
+breakdown, and the last session's result.
 
 ```yaml
 type: custom:stosslueft-card
 entity: sensor.stossluften_airing_score
-# optional
-name: Lüften?
-show_rooms: true
-show_last_session: true
+name: Lüften?          # optional
+show_rooms: true       # optional
+show_last_session: true # optional
 ```
 
-It shows the gauge with a tick at your recommendation threshold, the indoor/outdoor comparison and
-suggested duration, a live banner while a window is open, the per-room breakdown, and the last
-session's result. English and German are built in; it follows your Home Assistant language.
+**`stosslueft-compact-card`** — one row: verdict, score, and inside vs. outside. About the height of
+an entities-card row.
+
+```yaml
+type: custom:stosslueft-compact-card
+entity: sensor.stossluften_airing_score
+show_score: true # optional
+```
+
+**`stosslueft-chips-card`** — a traffic-light chip for the flat and one per room. Room names are in
+the tooltip; turn `show_names` on if you would rather read them directly, which is usually the better
+choice on a phone where there is no hover.
+
+```yaml
+type: custom:stosslueft-chips-card
+entity: sensor.stossluften_airing_score
+show_overall: true       # optional
+show_names: false        # optional
+rooms: [living_room, bedroom] # optional, defaults to all
+```
+
+Chip and gauge colours come from `--stosslueft-good`, `--stosslueft-neutral` and `--stosslueft-bad`,
+so a theme can override them.
 
 ## How the score works
 
@@ -95,6 +120,10 @@ can switch that off.
 The overall score is the mean of the room scores, so one hot room cannot hide behind five comfortable
 ones. The wording and the suggested duration come from scoring the flat as a whole.
 
+The 0–100 number is summarised as **good** (65 and above), **neutral** (35–64) or **bad** (below 35),
+which is what the cards lead with. The number stays underneath for automations, history graphs and
+for telling two good moments apart.
+
 Some worked examples with the default target of 21 °C:
 
 | Situation | Inside | Outside | Score |
@@ -113,8 +142,11 @@ settle time (10 minutes by default) — that is what makes the number honest.
 
 Two details worth knowing:
 
-- **Every room is measured, not just the ones with an open window.** The hallway cools too, and you
-  asked about the flat.
+- **Every room with a window contact is measured, not just the ones open right now.** The rest of
+  the flat cools during the same airing.
+- **Rooms with no window contact are left out of the cooldown figure.** An interior room is never
+  aired directly, so counting it would only water the number down. It is still scored, and still
+  counts toward the overall score — it just gets no cooldown sensor.
 - **Reopening a window during the settle time continues the same session** rather than starting a
   second one, so working through the flat window by window is reported as one airing.
 
@@ -123,7 +155,7 @@ stick restarting) never starts a session. An airing that spans a Home Assistant 
 back up.
 
 Cooldowns are reported in °C as a *difference*, which is why those sensors carry no device class:
-a 2 °C drop is 2 K, and converting it to Fahrenheit would be wrong.
+a 2 °C drop is a difference, not a temperature, and converting it to Fahrenheit would be wrong.
 
 ## Automations
 
@@ -139,11 +171,11 @@ automation:
       - action: notify.mobile_app
         data:
           title: >-
-            Cooled down {{ trigger.event.data.delta | round(1) }} K
+            Cooled down {{ trigger.event.data.delta | round(1) }} °C
           message: >-
             {{ trigger.event.data.duration_minutes | round }} min ·
             {% for room in trigger.event.data.rooms if room.delta %}
-            {{ room.name }} −{{ room.delta | round(1) }} K{{ ", " if not loop.last }}
+            {{ room.name }} −{{ room.delta | round(1) }} °C{{ ", " if not loop.last }}
             {%- endfor %}
 ```
 
@@ -159,7 +191,7 @@ To be told when it becomes worth airing, trigger on
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Target temperature | 21 °C | What every room is scored against. |
-| Comfort band | 1.5 K | How far from the target still counts as comfortable. |
+| Comfort band | 1.5 °C | How far from the target still counts as comfortable. |
 | Humidity weight | 0.2 | Base weight of the humidity comparison; 0 turns it off. |
 | Recommendation threshold | 65 | Where `binary_sensor.*_airing_recommended` flips. |
 | Settle time | 10 min | How long to wait after the windows shut before reporting. |

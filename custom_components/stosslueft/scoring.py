@@ -86,7 +86,7 @@ def projected_temperature(indoor: float, outdoor: float, duration: float) -> flo
 
 
 def _comfort_distance(temperature: float, target: float, band: float) -> float:
-    """How far outside the comfort band a temperature is, in K."""
+    """How far outside the comfort band a temperature is, in degrees."""
     return max(0.0, abs(temperature - target) - band)
 
 
@@ -153,10 +153,10 @@ def rating_for(score: float) -> str:
 _REASON_TEXT: dict[str, str] = {
     "no_data": "No temperature data",
     "rain": "It is raining -- windows stay shut",
-    "cooling_available": "{delta:.1f} K cooler outside, {duration:.0f} min is enough",
-    "warming_available": "{delta:.1f} K warmer outside, airing warms the room",
-    "too_warm_outside": "{delta:.1f} K warmer outside -- would heat the room up",
-    "heat_loss": "{delta:.1f} K colder outside -- would just waste heat",
+    "cooling_available": "{delta:.1f} °C cooler outside, {duration:.0f} min is enough",
+    "warming_available": "{delta:.1f} °C warmer outside, airing warms the room",
+    "too_warm_outside": "{delta:.1f} °C warmer outside -- would heat the room up",
+    "heat_loss": "{delta:.1f} °C colder outside -- would just waste heat",
     "drying": "Damp inside ({humidity:.0f} %), the outside air is drier",
     "would_add_moisture": "Damp inside ({humidity:.0f} %), but outside air is wetter still",
     "already_comfortable": "Comfortable already, little to gain",
