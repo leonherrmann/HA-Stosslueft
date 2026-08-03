@@ -18,6 +18,7 @@ from .const import (
     CARD_URL,
     DATA_FRONTEND_REGISTERED,
     DOMAIN,
+    ROOM_ENTITY_KEYS,
     ROOM_UNIQUE_ID_PREFIX,
 )
 from .coordinator import StoslueftCoordinator
@@ -59,6 +60,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: StoslueftConfigEntry) ->
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 
+    _async_migrate_room_unique_ids(hass, entry, coordinator)
     _async_remove_stale_rooms(hass, entry, coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
@@ -71,6 +73,40 @@ async def async_unload_entry(hass: HomeAssistant, entry: StoslueftConfigEntry) -
     if unloaded:
         await entry.runtime_data.async_shutdown()
     return unloaded
+
+
+@callback
+def _async_migrate_room_unique_ids(
+    hass: HomeAssistant, entry: StoslueftConfigEntry, coordinator: StoslueftCoordinator
+) -> None:
+    """Move pre-0.2.0 room entities onto the `room_` unique id scheme.
+
+    0.1.0 keyed room entities as `<entry>_<room>_<key>`. Marking them with a
+    `room_` prefix is what lets setup tell them from the flat-wide ones, but
+    without this the old entities would be orphaned as `unavailable` and fresh
+    ones created beside them with `_2` entity ids -- losing their history and
+    breaking any dashboard that referenced them.
+
+    Rebuilding the exact old and new ids from the configured rooms avoids
+    having to guess where the room id ends and the key begins.
+    """
+    registry = er.async_get(hass)
+
+    for room in coordinator.rooms:
+        for key in ROOM_ENTITY_KEYS:
+            legacy = f"{entry.entry_id}_{room.room_id}_{key}"
+            current = f"{entry.entry_id}_{ROOM_UNIQUE_ID_PREFIX}{room.room_id}_{key}"
+            entity_id = registry.async_get_entity_id(Platform.SENSOR, DOMAIN, legacy)
+            if entity_id is None:
+                continue
+            if registry.async_get_entity_id(Platform.SENSOR, DOMAIN, current):
+                # Already migrated on an earlier start and the old row somehow
+                # survived; removing it is better than colliding.
+                _LOGGER.debug("Dropping superseded %s", entity_id)
+                registry.async_remove(entity_id)
+                continue
+            _LOGGER.debug("Migrating %s to unique id %s", entity_id, current)
+            registry.async_update_entity(entity_id, new_unique_id=current)
 
 
 @callback

@@ -13,6 +13,7 @@ from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import ROOM_KEY_COOLDOWN, ROOM_KEY_SCORE
 from .coordinator import RoomConfig, StoslueftCoordinator
 from .entity import StoslueftEntity, StoslueftRoomEntity
 
@@ -113,7 +114,7 @@ class RoomScoreSensor(StoslueftRoomEntity, SensorEntity):
 
     def __init__(self, coordinator: StoslueftCoordinator, room: RoomConfig) -> None:
         """Initialise the sensor."""
-        super().__init__(coordinator, room, "score")
+        super().__init__(coordinator, room, ROOM_KEY_SCORE)
 
     @property
     def native_value(self) -> int | None:
@@ -211,7 +212,7 @@ class RoomCooldownSensor(StoslueftRoomEntity, SensorEntity):
 
     def __init__(self, coordinator: StoslueftCoordinator, room: RoomConfig) -> None:
         """Initialise the sensor."""
-        super().__init__(coordinator, room, "cooldown")
+        super().__init__(coordinator, room, ROOM_KEY_COOLDOWN)
 
     @property
     def native_value(self) -> float | None:

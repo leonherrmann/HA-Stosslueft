@@ -26,6 +26,38 @@ async def test_setup_and_unload(
     assert setup_integration.state is ConfigEntryState.NOT_LOADED
 
 
+async def test_migrates_pre_0_2_0_room_unique_ids(
+    hass: HomeAssistant, config_entry: MockConfigEntry, seed_states
+) -> None:
+    """Upgrading from 0.1.0 keeps a room's entity, history and entity id."""
+    from homeassistant.helpers import entity_registry as er
+    from homeassistant.setup import async_setup_component
+
+    from custom_components.stosslueft.const import DOMAIN
+
+    registry = er.async_get(hass)
+    # How 0.1.0 keyed them: no `room_` marker.
+    legacy = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{config_entry.entry_id}_living_room_score",
+        config_entry=config_entry,
+        suggested_object_id="stossluften_living_room_airing_score",
+    )
+    assert legacy.entity_id == "sensor.stossluften_living_room_airing_score"
+
+    assert await async_setup_component(hass, "sun", {})
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    migrated = registry.async_get(legacy.entity_id)
+    assert migrated is not None
+    assert migrated.unique_id == f"{config_entry.entry_id}_room_living_room_score"
+    # No duplicate was created alongside it.
+    assert hass.states.get("sensor.stossluften_living_room_airing_score_2") is None
+    assert hass.states.get("sensor.stossluften_living_room_airing_score") is not None
+
+
 async def test_card_is_served(
     hass: HomeAssistant, setup_integration: MockConfigEntry
 ) -> None:
