@@ -42,8 +42,12 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
         return
 
     card_path = Path(__file__).parent / "frontend" / CARD_FILENAME
+    # Cache aggressively. The frontend gives a custom element two seconds to
+    # register before it gives up with "Custom element not found", and an
+    # uncached re-fetch on every page load loses that race often enough to be
+    # noticed. The `?v=` below is what makes caching safe across upgrades.
     await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL, str(card_path), False)]
+        [StaticPathConfig(CARD_URL, str(card_path), True)]
     )
     integration = await async_get_integration(hass, DOMAIN)
     add_extra_js_url(hass, f"{CARD_URL}?v={integration.version}")

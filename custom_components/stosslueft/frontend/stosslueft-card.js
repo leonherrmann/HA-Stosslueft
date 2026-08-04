@@ -24,7 +24,6 @@ const TRANSLATIONS = {
     inside: "Inside",
     outside: "Outside",
     difference: "Difference",
-    suggested: "Suggested",
     minutes: "min",
     rooms: "Rooms",
     no_rooms: "No rooms configured yet.",
@@ -42,7 +41,7 @@ const TRANSLATIONS = {
     reasons: {
       no_data: "No temperature data",
       rain: "It is raining — windows stay shut",
-      cooling_available: "{delta} °C cooler outside, {duration} min is enough",
+      cooling_available: "{delta} °C cooler outside",
       warming_available: "{delta} °C warmer outside, airing warms the room",
       too_warm_outside: "{delta} °C warmer outside — would heat the flat up",
       heat_loss: "{delta} °C colder outside — would just waste heat",
@@ -57,7 +56,6 @@ const TRANSLATIONS = {
     inside: "Innen",
     outside: "Außen",
     difference: "Differenz",
-    suggested: "Empfohlen",
     minutes: "Min.",
     rooms: "Räume",
     no_rooms: "Noch keine Räume eingerichtet.",
@@ -75,7 +73,7 @@ const TRANSLATIONS = {
     reasons: {
       no_data: "Keine Temperaturdaten",
       rain: "Es regnet — Fenster bleiben zu",
-      cooling_available: "{delta} °C kühler draußen, {duration} Min. reichen",
+      cooling_available: "{delta} °C kühler draußen",
       warming_available: "{delta} °C wärmer draußen, Lüften wärmt den Raum",
       too_warm_outside: "{delta} °C wärmer draußen — würde die Wohnung aufheizen",
       heat_loss: "{delta} °C kälter draußen — würde nur Wärme verschwenden",
@@ -180,8 +178,7 @@ class StoslueftBaseCard extends HTMLElement {
     const placeholders = attributes.reason_placeholders || {};
     return template.replace(/\{(\w+)\}/g, (match, name) => {
       const value = placeholders[name];
-      if (typeof value !== "number") return match;
-      return name === "duration" ? String(Math.round(value)) : value.toFixed(1);
+      return typeof value === "number" ? value.toFixed(1) : match;
     });
   }
 
@@ -291,10 +288,6 @@ class StoslueftCard extends StoslueftBaseCard {
       [strings.inside, `${formatNumber(attributes.indoor_temperature)} °C`],
       [strings.outside, `${formatNumber(attributes.outdoor_temperature)} °C`],
       [strings.difference, `${formatSigned(attributes.temperature_delta)} °C`],
-      [
-        strings.suggested,
-        `${attributes.duration_minutes ?? "–"} ${strings.minutes}`,
-      ],
     ];
     return `<div class="stats">${items
       .map(

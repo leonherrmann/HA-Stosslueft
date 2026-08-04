@@ -51,7 +51,6 @@ class AiringRecommendedSensor(StoslueftEntity, BinarySensorEntity):
             "rating": data.overall.rating,
             "reason": data.overall.reason,
             "threshold": data.recommend_threshold,
-            "duration_minutes": data.overall.duration_minutes,
             "rooms": [
                 room.name
                 for room in sorted(

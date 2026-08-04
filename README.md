@@ -59,8 +59,8 @@ everything else from its attributes. English and German are built in; they follo
 language.
 
 **`stosslueft-card`** — the full card: gauge with a tick at your recommendation threshold, the
-indoor/outdoor comparison and suggested duration, a live banner while a window is open, the per-room
-breakdown, and the last session's result.
+indoor/outdoor comparison, a live banner while a window is open, the per-room breakdown, and the
+last session's result.
 
 ```yaml
 type: custom:stosslueft-card
@@ -126,10 +126,9 @@ Opening the windows drags every room towards the outdoor temperature. So the use
 dry the room out or wet it?". Scoring the *change* is what lets one formula work in July and in
 January.
 
-**Temperature.** From the indoor/outdoor difference the model derives a sensible airing duration
-(big difference → short airing), how much air is exchanged in that time, and how much of the drop
-survives once the walls give their heat back. It then compares how far the room is from your target
-temperature before and after. Getting closer scores positive, overshooting scores negative. A
+**Temperature.** From the indoor/outdoor difference the model works out how much air a typical
+airing exchanges and how much of the resulting drop survives once the walls give their heat back. It
+then compares how far the room is from your target temperature before and after. Getting closer scores positive, overshooting scores negative. A
 configurable comfort band around the target keeps small differences from moving the number around.
 
 **Humidity** (optional). Relative humidity is the wrong measure here — 90 % at 2 °C carries far less
@@ -143,7 +142,11 @@ temperature alone.
 can switch that off.
 
 The overall score is the mean of the room scores, so one hot room cannot hide behind five comfortable
-ones. The wording and the suggested duration come from scoring the flat as a whole.
+ones. The wording comes from scoring the flat as a whole.
+
+The model does **not** tell you how long to air for. It answers "is now a good time", which is a
+different question from "for how long" — in summer the answer is often "all night", and any single
+number would be wrong. How long you actually aired is measured and reported after the fact.
 
 The 0–100 number is summarised as **good** (65 and above), **neutral** (35–64) or **bad** (below 35),
 which is what the cards lead with. The number stays underneath for automations, history graphs and
@@ -153,10 +156,10 @@ Some worked examples with the default target of 21 °C:
 
 | Situation | Inside | Outside | Score |
 | --- | --- | --- | --- |
-| Summer night | 26 °C / 55 % | 18 °C / 80 % | 94 — air out, 15 min |
+| Summer night | 26 °C / 55 % | 18 °C / 80 % | 94 — air out |
 | Summer afternoon | 24 °C | 32 °C | 0 — keep them shut |
 | Muggy and warm | 24 °C / 70 % | 22 °C / 95 % | 0 — would import moisture |
-| Winter, damp room | 21 °C / 68 % | 2 °C / 90 % | 84 — 6 min to dry it out |
+| Winter, damp room | 21 °C / 68 % | 2 °C / 90 % | 84 — dries the room out |
 | Winter, comfortable | 21 °C / 45 % | 2 °C / 90 % | 20 — just wastes heat |
 
 ## Airing detection
