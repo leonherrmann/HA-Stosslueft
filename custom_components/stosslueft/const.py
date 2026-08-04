@@ -75,5 +75,12 @@ RATING_THRESHOLDS: Final = (
 # Marks the unique ids that belong to a room rather than to the whole flat.
 ROOM_UNIQUE_ID_PREFIX: Final = "room_"
 
+# Per-room entity keys. Must not contain an underscore: setup splits a room
+# unique id on the last one to recover the room id. Also drives the migration
+# of pre-0.2.0 unique ids, so keep it in step with the room entities.
+ROOM_KEY_SCORE: Final = "score"
+ROOM_KEY_COOLDOWN: Final = "cooldown"
+ROOM_ENTITY_KEYS: Final = (ROOM_KEY_SCORE, ROOM_KEY_COOLDOWN)
+
 UPDATE_INTERVAL_SECONDS: Final = 60
 STORAGE_VERSION: Final = 1

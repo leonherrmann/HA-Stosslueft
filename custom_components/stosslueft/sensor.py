@@ -13,6 +13,7 @@ from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import ROOM_KEY_COOLDOWN, ROOM_KEY_SCORE
 from .coordinator import RoomConfig, StoslueftCoordinator
 from .entity import StoslueftEntity, StoslueftRoomEntity
 
@@ -76,7 +77,6 @@ class AiringScoreSensor(StoslueftEntity, SensorEntity):
             "reason": data.overall.reason,
             "reason_key": data.overall.reason_key,
             "reason_placeholders": data.overall.reason_placeholders,
-            "duration_minutes": data.overall.duration_minutes,
             "blocked_reason": data.overall.blocked_reason,
             "recommend_threshold": data.recommend_threshold,
             "indoor_temperature": _round(data.indoor_temperature, 1),
@@ -113,7 +113,7 @@ class RoomScoreSensor(StoslueftRoomEntity, SensorEntity):
 
     def __init__(self, coordinator: StoslueftCoordinator, room: RoomConfig) -> None:
         """Initialise the sensor."""
-        super().__init__(coordinator, room, "score")
+        super().__init__(coordinator, room, ROOM_KEY_SCORE)
 
     @property
     def native_value(self) -> int | None:
@@ -132,7 +132,6 @@ class RoomScoreSensor(StoslueftRoomEntity, SensorEntity):
             "rating": score.rating,
             "reason": score.reason,
             "reason_key": score.reason_key,
-            "duration_minutes": score.duration_minutes,
             "blocked_reason": score.blocked_reason,
             "temperature": _round(room.temperature, 1),
             "humidity": _round(room.humidity, 1),
@@ -211,7 +210,7 @@ class RoomCooldownSensor(StoslueftRoomEntity, SensorEntity):
 
     def __init__(self, coordinator: StoslueftCoordinator, room: RoomConfig) -> None:
         """Initialise the sensor."""
-        super().__init__(coordinator, room, "cooldown")
+        super().__init__(coordinator, room, ROOM_KEY_COOLDOWN)
 
     @property
     def native_value(self) -> float | None:

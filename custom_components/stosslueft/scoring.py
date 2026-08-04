@@ -131,7 +131,6 @@ class Score:
     reason: str
     reason_key: str
     reason_placeholders: dict[str, float] = field(default_factory=dict)
-    duration_minutes: int = 0
     projected_temperature: float | None = None
     temperature_component: float = 0.0
     humidity_component: float | None = None
@@ -153,7 +152,7 @@ def rating_for(score: float) -> str:
 _REASON_TEXT: dict[str, str] = {
     "no_data": "No temperature data",
     "rain": "It is raining -- windows stay shut",
-    "cooling_available": "{delta:.1f} °C cooler outside, {duration:.0f} min is enough",
+    "cooling_available": "{delta:.1f} °C cooler outside",
     "warming_available": "{delta:.1f} °C warmer outside, airing warms the room",
     "too_warm_outside": "{delta:.1f} °C warmer outside -- would heat the room up",
     "heat_loss": "{delta:.1f} °C colder outside -- would just waste heat",
@@ -228,12 +227,12 @@ def score_conditions(
     elif temperature_component > 0.15:
         text, key, placeholders = _reason(
             "cooling_available" if delta < 0 else "warming_available",
-            {"delta": abs(delta), "duration": duration},
+            {"delta": abs(delta)},
         )
     elif temperature_component < -0.15:
         text, key, placeholders = _reason(
             "too_warm_outside" if delta > 0 else "heat_loss",
-            {"delta": abs(delta), "duration": duration},
+            {"delta": abs(delta)},
         )
     else:
         text, key, placeholders = _reason("already_comfortable", {})
@@ -244,7 +243,6 @@ def score_conditions(
         reason=text,
         reason_key=key,
         reason_placeholders=placeholders,
-        duration_minutes=round(duration),
         projected_temperature=round(projected, 2),
         temperature_component=round(temperature_component, 3),
         humidity_component=(
